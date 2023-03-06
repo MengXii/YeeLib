@@ -1,0 +1,8 @@
+
+build --cxxopt -std=c++17 --copt=-fdiagnostics-color=always
+
+build:cxx17 --cxxopt -std=c++17
+build:cxx20 --cxxopt -std=c++2a
+
+build:opt --copt -O3 --copt -ftree-vectorize --copt -lm
+build:dbg --copt -ggdb3 --copt -lm
