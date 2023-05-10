@@ -54,3 +54,15 @@ http_archive(
         "https://github.com/abseil/abseil-cpp/archive/refs/tags/20220623.0.tar.gz",
     ],
 )
+
+# ---------------------------------------------------------------------------- #
+#                                   benchmark                                  #
+# ---------------------------------------------------------------------------- #
+
+http_archive(
+    name = "com_google_benchmark",
+    urls = ["https://github.com/google/benchmark/archive/refs/tags/v1.6.0.tar.gz"],
+    sha256 = "1f71c72ce08d2c1310011ea6436b31e39ccab8c2db94186d26657d41747c85d6",
+    strip_prefix = "benchmark-1.6.0",    
+)
+
