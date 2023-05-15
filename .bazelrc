@@ -1,5 +1,7 @@
 
-build --cxxopt -std=c++17 --copt=-fdiagnostics-color=always
+build --cxxopt -std=c++17 --copt=-fdiagnostics-color=always  
+build --experimental_ui_max_stdouterr_bytes=107374181 --local_ram_resources=1024
+build --linkopt="-lstdc++ -lm -lrt -pthread -L/usr/local/lib"
 
 build:cxx17 --cxxopt -std=c++17
 build:cxx20 --cxxopt -std=c++2a
