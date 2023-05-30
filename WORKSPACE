@@ -66,3 +66,15 @@ http_archive(
     strip_prefix = "benchmark-1.6.0",    
 )
 
+# ---------------------------------------------------------------------------- #
+#                                   gsl-lite                                   #
+# ---------------------------------------------------------------------------- #
+http_archive(
+    name = "com_github_gsl-lite",
+    build_file = "//third_party:gsl-lite.BUILD",
+    sha256 = "65af4ec8a1050dac4f1ca4622881bb02a9c3978a9baec289fb56e25412d6cac7",
+    strip_prefix = "gsl-lite-0.40.0",
+    urls = [
+        "https://github.com/gsl-lite/gsl-lite/archive/refs/tags/v0.40.0.tar.gz",
+    ],
+)
