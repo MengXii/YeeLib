@@ -7,6 +7,15 @@ load(
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
+    name = "cpp_feature",
+    hdrs = [
+        "cpp_feature.h",
+    ],
+    srcs = [],
+    deps = [],
+)
+
+cc_library(
     name = "event_loop",
     hdrs = [
         "event_loop.h"
