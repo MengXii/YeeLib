@@ -13,6 +13,18 @@ namespace yeelib::network {
 
 enum MetaDataType : uint8_t { kNone = 0, kSocket = 1 };
 
+struct SendObj {
+  struct Raw {
+    const char *payload;
+    size_t payload_len;
+  }
+};
+
+enum IpVersion {
+  kIpv4 = 1,
+  kUnix = 2,
+};
+
 struct MetaDataSocket {
   std::string_view remore_ip;
   uint16_t remote_port{0};
