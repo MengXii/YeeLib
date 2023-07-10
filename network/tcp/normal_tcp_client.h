@@ -77,7 +77,7 @@ class NormalTcpClient : public ClientBase<NormalTcpClient> {
   uint64_t last_active_ts_;
 };
 
-inline bool NormalTcpClient::IsConnected const() {
+inline bool NormalTcpClient::IsConnected() const {
   return !connecting_ && conn_;
 }
 
