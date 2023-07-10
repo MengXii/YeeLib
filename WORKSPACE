@@ -85,7 +85,7 @@ http_archive(
 http_archive(
     name = "com_fmt",
     build_file = "//third_party:fmt.BUILD",
-    sha256 = "65af4ec8a1050dac4f1ca4622881bb02a9c3978a9baec289fb56e25412d6cac7",
+    sha256 = "5dea48d1fcddc3ec571ce2058e13910a0d4a6bab4cc09a809d8b1dd1c88ae6f2",
     strip_prefix = "fmt-9.1.0",
     urls = [
         "https://github.com/fmtlib/fmt/archive/refs/tags/9.1.0.tar.gz",
