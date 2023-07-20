@@ -6,13 +6,14 @@ load(
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
-    name = "log",
+    name = "shm_manager",
     hdrs = [
-        "log.h",
+        "shm_manager.h",
     ],
-    srcs = [],
+    srcs = [
+        "shm_manager.cpp",
+    ],
     deps = [
-        "//third_party:glog",
-        "@com_fmt//:fmt",
+        "//base/logging:log",
     ],
 )
