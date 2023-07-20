@@ -14,4 +14,7 @@ namespace base::logging {
 #define LLOG(module, lvl, ...) \
   LOG(lvl) << "[" #module "] " << fmt::format(__VA_ARGS__)
 
+#define FLOG(lvl, ...) \
+  LOG(lvl) << fmt::format(__VA_ARGS__) 
+
 }  // namespace base::logging
