@@ -78,3 +78,16 @@ http_archive(
         "https://github.com/gsl-lite/gsl-lite/archive/refs/tags/v0.40.0.tar.gz",
     ],
 )
+
+# ---------------------------------------------------------------------------- #
+#                                  fmt                                         #
+# ---------------------------------------------------------------------------- #
+http_archive(
+    name = "com_fmt",
+    build_file = "//third_party:fmt.BUILD",
+    sha256 = "5dea48d1fcddc3ec571ce2058e13910a0d4a6bab4cc09a809d8b1dd1c88ae6f2",
+    strip_prefix = "fmt-9.1.0",
+    urls = [
+        "https://github.com/fmtlib/fmt/archive/refs/tags/9.1.0.tar.gz",
+    ],
+)
