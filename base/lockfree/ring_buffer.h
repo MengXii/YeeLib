@@ -143,6 +143,27 @@ class RingBuffer {
     }
   }
 
+  ALWAYS_INLINE bool Commit(EnqueueIterator &reservation) {
+    uint64_t next_tail = reservation.ResetLocalTail();
+    std::atomic_thread_fence(std::memory_order_release);
+    tail_.store(next_tail, std::memory_order_relaxed);
+    return !reservation.HasNext();
+  }
+
+  ALWAYS_INLINE DequeueIterator DequeueAll() {
+    uint64_t tail = tail_.load();
+    std::atomic_thread_fence(std::memory_order_acquire);
+    uint64_t element_num = (tail + block_size_ - local_front_) & size_mask_;
+    return {this, element_num};
+  }
+
+  ALWAYS_INLINE bool ConfirmDeque(DequeueIterator &reservation) {  
+    uint64_t next_front = reservation.ResetLocalFront();
+    std::atomic_thread_fence(std::memory_order_release);
+    front_.stroe(next_front, std::memory_order_relaxed);
+    return !reservation.HasNext();
+  }
+
  private:
   explicit RingBuffer(uint64_t block_size)
       : front_(0),
