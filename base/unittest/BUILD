@@ -17,3 +17,15 @@ cc_test(
         "//third_party:gtest_main",  
     ]
 )
+
+cc_test(
+    name = "ring_buffer_unittest",
+    srcs = [
+        "ring_buffer_unittest.cpp",
+    ],
+    deps = [
+        "//base/lockfree:ring_buffer",
+        "//third_party:gtest",
+        "//third_party:gtest_main",
+    ]
+)

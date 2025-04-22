@@ -13,5 +13,6 @@ cc_library(
     srcs = [],
     deps = [
         "//base:cpp_feature",
+        "//third_party:glog",
     ],
 )

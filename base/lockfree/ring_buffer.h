@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <glog/logging.h>
+
 #include <atomic>
 #include <cstdint>
 
@@ -40,7 +42,7 @@ class RingBuffer {
       return (ring_->local_tail_ + pos_) & ring_->size_mask_;
     }
 
-    ALWAYS_INLINE bool HasNext() const { return pos_ ! = len_; }
+    ALWAYS_INLINE bool HasNext() const { return pos_ != len_; }
 
     ALWAYS_INLINE Pointer Next() {
       Pointer ret = reinterpret_cast<Pointer>(ring_->data_) +
@@ -71,7 +73,7 @@ class RingBuffer {
     ALWAYS_INLINE DequeueIterator(RingBuffer *ring, uint64_t len)
         : ring_(ring), len_(len), pos_(0) {}
 
-    ALWAYS_INLINE bool IsVaild() const { return ring_ != nullptr && HasNext(); }
+    ALWAYS_INLINE bool IsValid() const { return ring_ != nullptr && HasNext(); }
 
     ALWAYS_INLINE uint64_t ReservedSize() const { return len_; }
 
@@ -105,13 +107,13 @@ class RingBuffer {
     friend class RingBuffer;
   };
 
-  static uitn64_t RingSize(uint64_t block_size) {
+  static uint64_t RingSize(uint64_t block_size) {
     return sizeof(RingBuffer) + sizeof(ValueType) * block_size;
   }
 
   static RingBuffer *Create(uint64_t block_size) {
     uint64_t size = RingSize(block_size);
-    return Create(malloc(size).block_size, size);
+    return Create(malloc(size), block_size, size);
   }
 
   static RingBuffer *Create(void *addr, uint64_t block_size,
@@ -145,7 +147,10 @@ class RingBuffer {
 
   ALWAYS_INLINE bool Commit(EnqueueIterator &reservation) {
     uint64_t next_tail = reservation.ResetLocalTail();
-    std::atomic_thread_fence(std::memory_order_release);
+    std::atomic_thread_fence(
+        std::memory_order_release);  // note()
+                                     // 这里其实等价于tail_.store(next_tail,
+                                     // std::memory_order_release);
     tail_.store(next_tail, std::memory_order_relaxed);
     return !reservation.HasNext();
   }
@@ -157,10 +162,10 @@ class RingBuffer {
     return {this, element_num};
   }
 
-  ALWAYS_INLINE bool ConfirmDeque(DequeueIterator &reservation) {  
+  ALWAYS_INLINE bool ConfirmDeque(DequeueIterator &reservation) {
     uint64_t next_front = reservation.ResetLocalFront();
     std::atomic_thread_fence(std::memory_order_release);
-    front_.stroe(next_front, std::memory_order_relaxed);
+    front_.store(next_front, std::memory_order_relaxed);
     return !reservation.HasNext();
   }
 
@@ -174,22 +179,21 @@ class RingBuffer {
         size_mask_(block_size_ - 1) {
     bool size_check = IS_POWER_OF_TWO(block_size_) && block_size_ > 1;
     CHECK(size_check);
-    std::atomic_thread_fence(std::memory_order_seq_cst);
   }
 
-  ~RingBuffer() { std::atomic_thread_fence(std::memory_order_seq_cst); }
+  ~RingBuffer() {}
 
  private:
   std::atomic_uint64_t front_;
   uint64_t local_tail_;
-  uint8_t cacheline_filler_0[CACHE_LINE_SIZE - sizeof(atomic_uint64_t) -
-                             sizeof(uint64_t)];
+  uint8_t
+      cacheline_filler_0[CACHE_LINE_SIZE - sizeof(uint64_t) - sizeof(uint64_t)];
   std::atomic_uint64_t tail_;
   uint64_t local_front_;
-  uint8_t cacheline_filler_1[CACHE_LINE_SIZE - sizeof(atomic_uint64_t) -
-                             sizeof(uint64_t)];
+  uint8_t
+      cacheline_filler_1[CACHE_LINE_SIZE - sizeof(uint64_t) - sizeof(uint64_t)];
   const uint64_t block_size_;
-  const uint64_T size_mask_;
+  const uint64_t size_mask_;
 
   uint8_t data_[];
 
