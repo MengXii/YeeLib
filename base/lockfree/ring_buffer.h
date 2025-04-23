@@ -45,8 +45,7 @@ class RingBuffer {
     ALWAYS_INLINE bool HasNext() const { return pos_ != len_; }
 
     ALWAYS_INLINE Pointer Next() {
-      Pointer ret = reinterpret_cast<Pointer>(ring_->data_) +
-                    ((ring_->local_tail_ + pos_) & ring_->size_mask_);
+      Pointer ret = reinterpret_cast<Pointer>(ring_->data_) + NextTail();
       pos_++;
       return ret;
     }
@@ -86,8 +85,7 @@ class RingBuffer {
     ALWAYS_INLINE bool HasNext() const { return pos_ != len_; }
 
     ALWAYS_INLINE Pointer Next() {
-      Pointer ret = reinterpret_cast<Pointer>(ring_->data_) +
-                    ((ring_->local_front_ + pos_) & ring_->size_mask_);
+      Pointer ret = reinterpret_cast<Pointer>(ring_->data_) + NextFront();
       pos_++;
       return ret;
     }
