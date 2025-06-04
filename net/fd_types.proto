@@ -1,0 +1,22 @@
+/**
+ * Copyright (c) 2024.08.08
+ * Author: MengXii
+ */
+
+syntax = "proto3";
+
+package base.net;
+
+message FdMsg {
+  enum SockReqType {
+    DEFAULT = 0;
+    FD_REGISTER = 1;
+    FD_QUERY = 2;
+    FD_RESULT = 3;
+  };
+
+  SockReqType type = 1;
+  string service_name = 2;
+  repeated int32 fds = 3;
+  repeated string querys = 4;
+};
