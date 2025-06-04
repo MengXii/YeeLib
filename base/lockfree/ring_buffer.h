@@ -1,56 +1,59 @@
 /**
- * Copyright (c) 2023.05.30
+ * Copyright (c) 2024.01.30
  * Author: MengXii
  */
 
 #pragma once
 
-#include <glog/logging.h>
-
 #include <atomic>
+#include <cassert>
 #include <cstdint>
+#include <cstdlib>
+#include <functional>
+#include <memory>
+#include <type_traits>
+#include <vector>
+#include "glog/logging.h"
 
-#include "base/cpp_feature.h"
-
-namespace yeelib::base {
+namespace base {
+namespace lockfree {
 
 template <typename T>
 class RingBuffer {
-  static constexpr bool IS_POWER_OF_TWO(uint64_t x) {
-    return x && ((x & (x - 1)) == 0);
-  }
-
  public:
   constexpr static uint64_t CACHE_LINE_SIZE = 64;
-  using ValueType = T;
-  using Pointer = ValueType *;
+  using value_type = T;
+  using pointer = value_type *;
 
   class EnqueueIterator {
    public:
-    ALWAYS_INLINE EnqueueIterator() : ring_(nullptr), len_(0), pos_(0) {}
+    [[always_inline]] EnqueueIterator() : ring_(nullptr), len_(0), pos_(0) {}
 
-    ALWAYS_INLINE EnqueueIterator(RingBuffer *ring, uint64_t len)
+    [[always_inline]] EnqueueIterator(RingBuffer *ring, uint64_t len)
         : ring_(ring), len_(len), pos_(0) {}
 
-    ALWAYS_INLINE bool IsValid() const { return ring_ != nullptr && HasNext(); }
+    [[always_inline]] bool IsValid() const {
+      return ring_ != nullptr && HasNext();
+    }
 
-    ALWAYS_INLINE uint64_t Size() const { return len_; }
+    [[always_inline]] uint64_t ReservedSize() const { return len_; }
 
-    ALWAYS_INLINE uint64_t IteratedPosition() const { return pos_; }
+    [[always_inline]] uint64_t IteratedSize() const { return pos_; }
 
-    ALWAYS_INLINE uint64_t NextTail() const {
+    [[always_inline]] uint64_t NextTail() const {
       return (ring_->local_tail_ + pos_) & ring_->size_mask_;
     }
 
-    ALWAYS_INLINE bool HasNext() const { return pos_ != len_; }
+    [[always_inline]] bool HasNext() const { return pos_ != len_; }
 
-    ALWAYS_INLINE Pointer Next() {
-      Pointer ret = reinterpret_cast<Pointer>(ring_->data_) + NextTail();
+    [[always_inline]] pointer Next() {
+      pointer ret = reinterpret_cast<pointer>(ring_->data_) +
+                    ((ring_->local_tail_ + pos_) & ring_->size_mask_);
       pos_++;
       return ret;
     }
 
-    ALWAYS_INLINE uint64_t ResetLocalTail() {
+    [[always_inline]] uint64_t ResetLocalTail() {
       ring_->local_tail_ = NextTail();
       len_ = len_ - pos_;
       pos_ = 0;
@@ -67,30 +70,33 @@ class RingBuffer {
 
   class DequeueIterator {
    public:
-    ALWAYS_INLINE DequeueIterator() : ring_(nullptr), len_(0), pos_(0) {}
+    [[always_inline]] DequeueIterator() : ring_(nullptr), len_(0), pos_(0) {}
 
-    ALWAYS_INLINE DequeueIterator(RingBuffer *ring, uint64_t len)
+    [[always_inline]] DequeueIterator(RingBuffer *ring, uint64_t len)
         : ring_(ring), len_(len), pos_(0) {}
 
-    ALWAYS_INLINE bool IsValid() const { return ring_ != nullptr && HasNext(); }
+    [[always_inline]] bool IsValid() const {
+      return ring_ != nullptr && HasNext();
+    }
 
-    ALWAYS_INLINE uint64_t ReservedSize() const { return len_; }
+    [[always_inline]] uint64_t ReservedSize() const { return len_; }
 
-    ALWAYS_INLINE uint64_t IteratedPosition() const { return pos_; }
+    [[always_inline]] uint64_t IteratedSize() const { return pos_; }
 
-    ALWAYS_INLINE uint64_t NextFront() const {
+    [[always_inline]] uint64_t NextFront() const {
       return (ring_->local_front_ + pos_) & ring_->size_mask_;
     }
 
-    ALWAYS_INLINE bool HasNext() const { return pos_ != len_; }
+    [[always_inline]] bool HasNext() const { return pos_ != len_; }
 
-    ALWAYS_INLINE Pointer Next() {
-      Pointer ret = reinterpret_cast<Pointer>(ring_->data_) + NextFront();
+    [[always_inline]] pointer Next() {
+      pointer ret = reinterpret_cast<pointer>(ring_->data_) +
+                    ((ring_->local_front_ + pos_) & ring_->size_mask_);
       pos_++;
       return ret;
     }
 
-    ALWAYS_INLINE uint64_t ResetLocalFront() {
+    [[always_inline]] uint64_t ResetLocalFront() {
       ring_->local_front_ = NextFront();
       len_ = len_ - pos_;
       pos_ = 0;
@@ -106,12 +112,9 @@ class RingBuffer {
   };
 
   static uint64_t RingSize(uint64_t block_size) {
-    return sizeof(RingBuffer) + sizeof(ValueType) * block_size;
-  }
-
-  static RingBuffer *Create(uint64_t block_size) {
-    uint64_t size = RingSize(block_size);
-    return Create(malloc(size), block_size, size);
+    // Calculate enough memory for the block itself, as well as all the
+    // elements it will contain
+    return sizeof(RingBuffer) + sizeof(value_type) * block_size;
   }
 
   static RingBuffer *Create(void *addr, uint64_t block_size,
@@ -120,7 +123,7 @@ class RingBuffer {
     if (addr_len < size) {
       return nullptr;
     }
-    uint8_t *p = reinterpret_cast<uint8_t *>(addr);
+    uint8_t *p = static_cast<uint8_t *>(addr);
     return new (p) RingBuffer(block_size);
   }
 
@@ -130,11 +133,14 @@ class RingBuffer {
     if (addr_len < size) {
       return nullptr;
     }
-    return reinterpret_cast<RingBuffer *>(addr);
+    return static_cast<RingBuffer *>(addr);
   }
 
-  ALWAYS_INLINE EnqueueIterator Reserve(uint64_t reserve) {
-    uint64_t front = front_.load(std::memory_order_acquire);
+  // reserve and commit can only be called in producer
+  // and must be paired up
+  [[always_inline]] EnqueueIterator Reserve(uint64_t reserve) {
+    uint64_t front = front_.load();
+    std::atomic_thread_fence(std::memory_order_acquire);
     uint64_t element_num = (local_tail_ + block_size_ - front) & size_mask_;
     if (block_size_ - element_num > reserve) {
       return {this, reserve};
@@ -143,28 +149,51 @@ class RingBuffer {
     }
   }
 
-  ALWAYS_INLINE bool Commit(EnqueueIterator &reservation) {
+  // return true if reservation doesn't have remaining
+  [[always_inline]] bool Commit(EnqueueIterator &reservation) {  // NOLINT
     uint64_t next_tail = reservation.ResetLocalTail();
-    std::atomic_thread_fence(
-        std::memory_order_release);  // note()
-                                     // 这里其实等价于tail_.store(next_tail,
-                                     // std::memory_order_release);
-    tail_.store(next_tail, std::memory_order_relaxed);
+    std::atomic_thread_fence(std::memory_order_release);
+    tail_ = next_tail;
     return !reservation.HasNext();
   }
 
-  ALWAYS_INLINE DequeueIterator DequeueAll() {
+  // must be paired up with confirm deque
+  [[always_inline]] DequeueIterator DequeueAll() {
     uint64_t tail = tail_.load();
     std::atomic_thread_fence(std::memory_order_acquire);
+    // only intersted in used
     uint64_t element_num = (tail + block_size_ - local_front_) & size_mask_;
     return {this, element_num};
   }
 
-  ALWAYS_INLINE bool ConfirmDeque(DequeueIterator &reservation) {
+  // return true if reservation doesn't have remaining
+  [[always_inline]] bool ConfirmDeque(DequeueIterator &reservation) {  // NOLINT
     uint64_t next_front = reservation.ResetLocalFront();
     std::atomic_thread_fence(std::memory_order_release);
-    front_.store(next_front, std::memory_order_relaxed);
+    front_ = next_front;
     return !reservation.HasNext();
+  }
+
+  // Returns the approximate number of items currently in the queue.
+  // Safe to call from both the producer and consumer threads.
+  inline size_t SizeApprox() const {
+    uint64_t front = front_.load();
+    uint64_t tail = tail_.load();
+    std::atomic_thread_fence(std::memory_order_acquire);
+    return (tail - front) & size_mask_;
+  }
+
+  // Note(chen): only for debug
+  uint64_t GetFront() {
+    uint64_t front = front_.load();
+    std::atomic_thread_fence(std::memory_order_acquire);
+    return front;
+  }
+
+  uint64_t GetTail() {
+    uint64_t tail = tail_.load();
+    std::atomic_thread_fence(std::memory_order_acquire);
+    return tail;
   }
 
  private:
@@ -175,26 +204,43 @@ class RingBuffer {
         local_front_(0),
         block_size_(block_size),
         size_mask_(block_size_ - 1) {
-    bool size_check = IS_POWER_OF_TWO(block_size_) && block_size_ > 1;
-    CHECK(size_check);
+    // Make sure the reader/writer threads will have the initialized memory
+    // setup above:
+    CHECK(__builtin_popcountll(block_size_));
+    std::atomic_thread_fence(std::memory_order_seq_cst);
   }
 
-  ~RingBuffer() {}
+  // Note: The queue should not be accessed concurrently while it's
+  // being deleted. It's up to the user to synchronize this.
+  ~RingBuffer() {
+    // Make sure we get the latest version of all variables from other CPUs:
+    std::atomic_thread_fence(std::memory_order_seq_cst);
+    // todo(chen);
+  }
 
  private:
-  std::atomic_uint64_t front_;
-  uint64_t local_tail_;
-  uint8_t
-      cacheline_filler_0[CACHE_LINE_SIZE - sizeof(uint64_t) - sizeof(uint64_t)];
-  std::atomic_uint64_t tail_;
+  // Avoid false-sharing by putting highly contended variables on their own
+  // cache lines
+  std::atomic<uint64_t> front_;  // (Atomic) Elements are read from here
+  uint64_t local_tail_;  // An uncontended shadow copy of tail, owned by the
+                         // consumer
+
+  uint8_t cacheline_filler0_[CACHE_LINE_SIZE -
+                             sizeof(std::atomic<uint64_t>) -
+                             sizeof(uint64_t)];
+  std::atomic<uint64_t> tail_;  // (Atomic) Elements are enqueued here
   uint64_t local_front_;
+
   uint8_t
-      cacheline_filler_1[CACHE_LINE_SIZE - sizeof(uint64_t) - sizeof(uint64_t)];
+      cacheline_filler1_[CACHE_LINE_SIZE - sizeof(std::atomic<uint64_t>) -
+                         sizeof(uint64_t)];  // next isn't very contended, but
+                                             // we don't want it on the same
+                                             // cache line as tail (which is)
   const uint64_t block_size_;
   const uint64_t size_mask_;
 
   uint8_t data_[];
-
-  DISALLOW_COPY_AND_ASSIGN(RingBuffer);
 };
-}  // namespace yeelib::base
+
+}  // namespace lockfree
+}  // namespace base

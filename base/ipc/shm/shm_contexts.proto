@@ -1,0 +1,14 @@
+syntax = "proto2";
+
+package base.ipc.shm;
+
+message ShmSenderContext {
+  enum SendMode {
+    LOW_LATENCT = 1;
+    THROUGHPUT = 2;
+  };
+  optional SendMode send_mode = 1 [default = THROUGHPUT];
+  optional int32 bulk_commit_size = 2 [default = 5];
+  optional int32 sender_queue_size = 3 [default = 10];
+  optional int32 shm_queue_block_size = 4 [default = 1024];
+};
